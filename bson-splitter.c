@@ -21,17 +21,25 @@ bson_doc_hnd_t* bson_decode(FILE *fp) {
 
     unsigned char header[4];
     int32_t doc_size;
+    size_t r;
 
     bson_doc_hnd_t *ret_ptr;
 
-    if (read_fully(header, 0, 4, fp) != 4) {
+    if ((r = read_fully(header, 0, 4, fp)) != 4) {
+        if (r == 0) { // eof
+            return NULL;
+        }
+        printf("ERROR: expected %d, got %ld. Corrupted BSON file?\n", 4, r);
         return NULL;
     }
 
     doc_size = *((int32_t*) header) - 4;
 
-    if (doc_size < 5)
+    if (doc_size < 5){
+        printf("ERROR: unable to read document size (%d). Corrupted BSON file?\n", doc_size);
         return NULL;
+    }
+        
 
     ret_ptr = malloc(sizeof(bson_doc_hnd_t));
     ret_ptr->payload = malloc(doc_size + 4);
@@ -39,7 +47,8 @@ bson_doc_hnd_t* bson_decode(FILE *fp) {
 
     memcpy(ret_ptr->payload, &header, 4);
 
-    if (read_fully(ret_ptr->payload, 4, doc_size, fp) != doc_size) {
+    if ((r = read_fully(ret_ptr->payload, 4, doc_size, fp)) != doc_size) {
+        printf("ERROR: expected %d, got %ld. Corrupted BSON file?\n", doc_size, r);
         free(ret_ptr->payload);
         free(ret_ptr);
         return NULL;
@@ -57,7 +66,7 @@ size_t read_fully(unsigned char *dest, size_t start, size_t len, FILE *fp) {
 
         read = fread(dest + start, 1, len, fp);
         if (!read)
-            return read;
+            return tot;
 
         goal  -= read;
         start += read;
