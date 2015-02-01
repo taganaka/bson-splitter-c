@@ -39,11 +39,11 @@ bson_doc_hnd_t* bson_decode(FILE *fp) {
     // Doc len includes first 4 bytes as well
     doc_size = *((int32_t*) header) - OFFSET;
 
-    if (doc_size < 5){
+    if (doc_size < 5) {
         printf("ERROR: unable to read document size (%d). Corrupted BSON file?\n", doc_size);
         return NULL;
     }
-    
+
     ret_ptr = (bson_doc_hnd_t *)malloc(sizeof(bson_doc_hnd_t));
     if (ret_ptr == NULL) {
         printf("ERROR: malloc failed\n");
@@ -114,9 +114,9 @@ int main(int argc, const char * argv[]) {
     if (strcmp(argv[1], "-") == 0) {
         fp = stdin;
     } else {
-        fp = fopen(argv[1],"rb");    
+        fp = fopen(argv[1],"rb");
     }
-    
+
 
     if (!fp) {
         printf("Can't open %s for reading\n", argv[1]);
