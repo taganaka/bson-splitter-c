@@ -35,16 +35,26 @@ bson_doc_hnd_t* bson_decode(FILE *fp) {
         return NULL;
     }
 
+    // Doc len is stored into the first 4 bytes
+    // Doc len includes first 4 bytes as well
     doc_size = *((int32_t*) header) - OFFSET;
 
     if (doc_size < 5){
         printf("ERROR: unable to read document size (%d). Corrupted BSON file?\n", doc_size);
         return NULL;
     }
-        
-
-    ret_ptr = malloc(sizeof(bson_doc_hnd_t));
-    ret_ptr->payload      = malloc(doc_size + OFFSET);
+    
+    ret_ptr = (bson_doc_hnd_t *)malloc(sizeof(bson_doc_hnd_t));
+    if (ret_ptr == NULL) {
+        printf("ERROR: malloc failed\n");
+        return NULL;
+    }
+    ret_ptr->payload      = (unsigned char*)malloc(doc_size + OFFSET);
+    if (ret_ptr->payload == NULL) {
+        free(ret_ptr);
+        printf("ERROR: malloc failed\n");
+        return NULL;
+    }
     ret_ptr->len          = doc_size;
     ret_ptr->payload_size = doc_size + OFFSET;
 
@@ -61,6 +71,7 @@ bson_doc_hnd_t* bson_decode(FILE *fp) {
 }
 
 size_t read_fully(unsigned char *dest, size_t start, size_t len, FILE *fp) {
+
     size_t goal = len;
     size_t tot  = 0;
     size_t read = 0;
@@ -79,6 +90,7 @@ size_t read_fully(unsigned char *dest, size_t start, size_t len, FILE *fp) {
 }
 
 void usage() {
+
     printf("Usage:\n");
     printf("  bson-splitter <bson file> <split size in MB>\n");
     printf("  Es: ./bson-splitter /backup/huge.bson 250\n");
@@ -108,16 +120,19 @@ int main(int argc, const char * argv[]) {
 
     if (!fp) {
         printf("Can't open %s for reading\n", argv[1]);
+        usage();
         return EXIT_FAILURE;
     }
 
     if (sscanf (argv[2], "%i", &size_in_mb) != 1) {
         printf("Error: %s not an integer\n", argv[2]);
+        usage();
         return EXIT_FAILURE;
     }
 
     if (size_in_mb <= 0) {
         printf("Error: %d needs to be a positive value\n", size_in_mb);
+        usage();
         return EXIT_FAILURE;
     }
 
@@ -150,6 +165,7 @@ int main(int argc, const char * argv[]) {
 
         free(doc_ptr->payload);
         free(doc_ptr);
+
     }
 
     if (ofp) {
@@ -159,5 +175,9 @@ int main(int argc, const char * argv[]) {
     }
 
     fclose(fp);
+
+    if (num_doc > 0) {
+        printf("%ld documents dumped into %d splits\n", num_doc, num_split);
+    }
     return EXIT_SUCCESS;
 }
