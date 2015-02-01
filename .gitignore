@@ -30,3 +30,5 @@
 dump/
 bson-splitter
 *.bson
+
+*.orig
