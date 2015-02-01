@@ -1,6 +1,5 @@
 //
-//  main.c
-//  bison-splitter-c
+//  bson-splitter-c
 //
 //  Created by Francesco Laurita on 1/31/15.
 //  Copyright (c) 2015 Francesco Laurita. All rights reserved.
@@ -46,19 +45,45 @@ bson_doc_hnd_t* bson_decode(FILE *fp){
   return ret_ptr;
 }
 
+void usage(){
+  printf("Usage:\n");
+  printf("  bson-splitter <bson file> <split size in MB>\n");
+  printf("  Es: ./bson-splitter /backup/huge.bson 250\n");
+}
+
 int main(int argc, const char * argv[]) {
+
+  if (argc < 3){
+    usage();
+    return EXIT_FAILURE;
+  }
     
   FILE *fp, *ofp;
   size_t num_doc = 0, bytes_written = 0, current_doc_num = 0;
   int num_split = 1;
   char fname[255];
-  size_t fsize = 10 * 1024 * 1024;
+  size_t fsize;
+  int size_in_mb;
   bson_doc_hnd_t *doc_ptr;
   
   fp = fopen(argv[1],"rb");
   
-  if (!fp)
+  if (!fp){
+    printf("Can't open %s for reading\n", argv[1]);
     return EXIT_FAILURE;
+  }
+
+  if (sscanf (argv[2], "%i", &size_in_mb) != 1) { 
+    printf ("Error: %s not an integer\n", argv[2]);
+    return EXIT_FAILURE;
+  }
+
+  if (size_in_mb <= 0){
+    printf ("Error: %d needs to be a positive value\n", size_in_mb);
+    return EXIT_FAILURE;
+  }
+  
+  fsize = size_in_mb * 1024 * 1024;
   
   sprintf(fname, "split-%d.bson", num_split);
   ofp = fopen(fname, "wb");
