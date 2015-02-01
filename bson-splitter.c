@@ -8,9 +8,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#define OFFSET 4
 
 typedef struct {
     int32_t       len;
+    int32_t       payload_size;
     unsigned char *payload;
 } bson_doc_hnd_t;
 
@@ -19,21 +21,21 @@ bson_doc_hnd_t* bson_decode(FILE*);
 
 bson_doc_hnd_t* bson_decode(FILE *fp) {
 
-    unsigned char header[4];
+    unsigned char header[OFFSET];
     int32_t doc_size;
     size_t r;
 
     bson_doc_hnd_t *ret_ptr;
 
-    if ((r = read_fully(header, 0, 4, fp)) != 4) {
+    if ((r = read_fully(header, 0, OFFSET, fp)) != OFFSET) {
         if (r == 0) { // eof
             return NULL;
         }
-        printf("ERROR: expected %d, got %ld. Corrupted BSON file?\n", 4, r);
+        printf("ERROR: expected %d, got %ld. Corrupted BSON file?\n", OFFSET, r);
         return NULL;
     }
 
-    doc_size = *((int32_t*) header) - 4;
+    doc_size = *((int32_t*) header) - OFFSET;
 
     if (doc_size < 5){
         printf("ERROR: unable to read document size (%d). Corrupted BSON file?\n", doc_size);
@@ -42,12 +44,13 @@ bson_doc_hnd_t* bson_decode(FILE *fp) {
         
 
     ret_ptr = malloc(sizeof(bson_doc_hnd_t));
-    ret_ptr->payload = malloc(doc_size + 4);
-    ret_ptr->len     = doc_size;
+    ret_ptr->payload      = malloc(doc_size + OFFSET);
+    ret_ptr->len          = doc_size;
+    ret_ptr->payload_size = doc_size + OFFSET;
 
-    memcpy(ret_ptr->payload, &header, 4);
+    memcpy(ret_ptr->payload, &header, OFFSET);
 
-    if ((r = read_fully(ret_ptr->payload, 4, doc_size, fp)) != doc_size) {
+    if ((r = read_fully(ret_ptr->payload, OFFSET, doc_size, fp)) != doc_size) {
         printf("ERROR: expected %d, got %ld. Corrupted BSON file?\n", doc_size, r);
         free(ret_ptr->payload);
         free(ret_ptr);
@@ -132,7 +135,7 @@ int main(int argc, const char * argv[]) {
 
         num_doc++;
         current_doc_num++;
-        bytes_written += fwrite(doc_ptr->payload, sizeof(unsigned char), doc_ptr->len + 4, ofp);
+        bytes_written += fwrite(doc_ptr->payload, sizeof(unsigned char), doc_ptr->payload_size, ofp);
 
         if (bytes_written > fsize) {
             num_split++;
