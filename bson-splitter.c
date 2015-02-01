@@ -14,18 +14,20 @@ typedef struct {
   unsigned char *payload;
 } bson_doc_hnd_t;
 
+size_t read_fully(unsigned char *dest, size_t start, size_t len, FILE *fp);
 
 bson_doc_hnd_t* bson_decode(FILE *fp){
     
   unsigned char header[4];
-  size_t read;
-  read = fread(header, 1, 4, fp);
+  int32_t doc_size;
+  
   bson_doc_hnd_t *ret_ptr;
-  
-  if (read != 4)
+
+  if (read_fully(header, 0, 4, fp) != 4) {
     return NULL;
-  
-  int32_t doc_size = *((int32_t*) header) - 4;
+  }
+
+  doc_size = *((int32_t*) header) - 4;
   
   if (doc_size < 5)
     return NULL;
@@ -35,14 +37,32 @@ bson_doc_hnd_t* bson_decode(FILE *fp){
   ret_ptr->len     = doc_size;
   
   memcpy(ret_ptr->payload, &header, 4);
-  
-  if (fread(ret_ptr->payload + 4, 1, doc_size, fp) != doc_size){
+
+  if (read_fully(ret_ptr->payload, 4, doc_size, fp) != doc_size) {
     free(ret_ptr->payload);
     free(ret_ptr);
     return NULL;
   }
   
   return ret_ptr;
+}
+
+size_t read_fully(unsigned char *dest, size_t start, size_t len, FILE *fp){
+  size_t goal = len;
+  size_t tot  = 0;
+  size_t read = 0;
+
+  while (goal > 0) {
+
+    read = fread(dest + start, 1, len, fp);
+    if (!read)
+      return read;
+
+    goal  -= read;
+    start += read;
+    tot   += read;
+  }
+  return tot;
 }
 
 void usage(){
