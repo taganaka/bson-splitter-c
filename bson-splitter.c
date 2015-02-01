@@ -109,12 +109,12 @@ int main(int argc, const char * argv[]) {
     }
 
     if (sscanf (argv[2], "%i", &size_in_mb) != 1) {
-        printf ("Error: %s not an integer\n", argv[2]);
+        printf("Error: %s not an integer\n", argv[2]);
         return EXIT_FAILURE;
     }
 
     if (size_in_mb <= 0) {
-        printf ("Error: %d needs to be a positive value\n", size_in_mb);
+        printf("Error: %d needs to be a positive value\n", size_in_mb);
         return EXIT_FAILURE;
     }
 
