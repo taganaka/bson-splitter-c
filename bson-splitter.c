@@ -87,7 +87,12 @@ int main(int argc, const char * argv[]) {
     int size_in_mb;
     bson_doc_hnd_t *doc_ptr;
 
-    fp = fopen(argv[1],"rb");
+    if (strcmp(argv[1], "-") == 0) {
+        fp = stdin;
+    } else {
+        fp = fopen(argv[1],"rb");    
+    }
+    
 
     if (!fp) {
         printf("Can't open %s for reading\n", argv[1]);
