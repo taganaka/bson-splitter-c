@@ -27,5 +27,6 @@
 *.i*86
 *.x86_64
 *.hex
-.dump/
+dump/
 bson-splitter
+split-*.bson
