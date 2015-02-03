@@ -37,7 +37,7 @@ bson_doc_hnd_t* bson_decode(FILE *fp) {
 
     // Doc len is stored into the first 4 bytes
     // Doc len includes first 4 bytes as well
-    doc_size = *((int32_t*) header) - OFFSET;
+    doc_size =  ((header[3] << 24) | (header[2] << 16) | (header[1] << 8) | header[0]) - OFFSET;
 
     if (doc_size < 5) {
         printf("ERROR: unable to read document size (%d). Corrupted BSON file?\n", doc_size);
