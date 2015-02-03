@@ -4,7 +4,7 @@
 //  Created by Francesco Laurita on 1/31/15.
 //  Copyright (c) 2015 Francesco Laurita <francesco.laurita@gmail.com>. All rights reserved.
 //
-
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -147,7 +147,8 @@ int main(int argc, char * argv[]) {
         return EXIT_FAILURE;
     }
 
-    for (int i = 0; i < (argc - optind); ++i){
+    int i;
+    for (i = 0; i < (argc - optind); ++i){
         switch (i) {
             case 0:
                 if (strcmp(argv[i + optind], "-") == 0) {
