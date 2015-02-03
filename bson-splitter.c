@@ -104,7 +104,7 @@ void usage() {
 int main(int argc, char * argv[]) {
 
     char *fmask = NULL;
-    FILE *fp, *ofp;
+    FILE *fp = NULL, *ofp = NULL;
     size_t num_doc = 0, bytes_written = 0, current_doc_num = 0;
     int num_split = 1;
     char *current_split_name = NULL;
@@ -175,8 +175,6 @@ int main(int argc, char * argv[]) {
                     usage();
                     return EXIT_FAILURE;
                 }
-
-                fsize = size_in_mb * 1024 * 1024;
                 break;
             default:
                 fprintf(stderr,"Too many positional argumemts\n");
@@ -187,8 +185,11 @@ int main(int argc, char * argv[]) {
         }
      }
 
-    
-    asprintf(&current_split_name, fmask, num_split);
+    fsize = size_in_mb * 1024 * 1024;
+    if (asprintf(&current_split_name, fmask, num_split) == -1) {
+        fprintf(stderr, "Unable allocate new file name\n");
+        return EXIT_FAILURE;
+    }
     ofp = fopen(current_split_name, "wb");
 
     if (!ofp) {
@@ -213,7 +214,10 @@ int main(int argc, char * argv[]) {
             fclose(ofp);
             printf("[%s] bytes written: %ld docs dumped: %ld\n", current_split_name, bytes_written, current_doc_num);
             free(current_split_name);
-            asprintf(&current_split_name, fmask, num_split);
+            if (asprintf(&current_split_name, fmask, num_split) == -1) {
+                fprintf(stderr, "Unable allocate new file name\n");
+                return EXIT_FAILURE;
+            }
             bytes_written   = 0;
             current_doc_num = 0;
             ofp = fopen(current_split_name, "wb");
