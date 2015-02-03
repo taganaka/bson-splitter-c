@@ -8,7 +8,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <ctype.h>
+
 #define OFFSET 4
+#define DEFAULT_SPLIT_NAME "split-%d.bson"
 
 typedef struct {
     int32_t       len;
@@ -91,55 +95,105 @@ size_t read_fully(unsigned char *dest, size_t start, size_t len, FILE *fp) {
 
 void usage() {
 
-    printf("Usage:\n");
-    printf("  bson-splitter <bson file> <split size in MB>\n");
-    printf("  Es: ./bson-splitter /backup/huge.bson 250\n");
+    fprintf(stderr, "Usage:\n");
+    fprintf(stderr, "  bson-splitter [options] <bson file> <split size in MB>\n");
+    fprintf(stderr, "  Es: ./bson-splitter /backup/huge.bson 250\n");
 }
 
-int main(int argc, const char * argv[]) {
 
-    if (argc < 3) {
-        usage();
-        return EXIT_FAILURE;
-    }
+int main(int argc, char * argv[]) {
 
+    char *fmask = NULL;
     FILE *fp, *ofp;
     size_t num_doc = 0, bytes_written = 0, current_doc_num = 0;
     int num_split = 1;
-    char fname[255];
+    char *current_split_name = NULL;
     size_t fsize;
-    int size_in_mb;
+    int size_in_mb = 0;
     bson_doc_hnd_t *doc_ptr;
 
-    if (strcmp(argv[1], "-") == 0) {
-        fp = stdin;
-    } else {
-        fp = fopen(argv[1],"rb");
+    int c;
+    while ((c = getopt (argc, argv, "f:")) != -1){
+        switch (c) {
+            case 'f':
+                if (strstr(optarg, "%d") == NULL) {
+                    fprintf(stderr, "Options -f requires '%%d' somewhere. Got %s\n", optarg);
+                    usage();
+                    return EXIT_FAILURE;
+                }
+                fmask = optarg;
+                break;
+            case '?':
+                if (optopt == 'f') 
+                    fprintf (stderr, "Option -%c requires an argument.\n", optopt);
+                else if (isprint (optopt))
+                    fprintf (stderr, "Unknown option `-%c'.\n", optopt);
+                else
+                    fprintf (stderr, "Unknown option character `\\x%x'.\n", optopt);
+            default:
+                usage();
+                return EXIT_FAILURE;
+        }
     }
 
+    
+    if (fmask == NULL) {
+        fmask = DEFAULT_SPLIT_NAME;
+    }
 
-    if (!fp) {
-        printf("Can't open %s for reading\n", argv[1]);
+    
+    if (argv[optind] == NULL || argv[optind + 1] == NULL) {
         usage();
         return EXIT_FAILURE;
     }
 
-    if (sscanf (argv[2], "%i", &size_in_mb) != 1) {
-        printf("Error: %s not an integer\n", argv[2]);
-        usage();
+    for (int i = 0; i < (argc - optind); ++i){
+        switch (i) {
+            case 0:
+                if (strcmp(argv[i + optind], "-") == 0) {
+                    fp = stdin;
+                } else {
+                    fp = fopen(argv[i + optind],"rb");
+                }
+
+                if (!fp) {
+                    fprintf(stderr, "Can't open %s for reading\n", argv[i]);
+                    usage();
+                    return EXIT_FAILURE;
+                }
+                break;
+            case 1:
+                if (sscanf (argv[i + optind], "%i", &size_in_mb) != 1) {
+                    fprintf(stderr, "Error: %s is not an integer\n", argv[i + optind]);
+                    usage();
+                    return EXIT_FAILURE;
+                }
+
+                if (size_in_mb <= 0) {
+                    fprintf(stderr, "Error: %d needs to be a positive value\n", size_in_mb);
+                    usage();
+                    return EXIT_FAILURE;
+                }
+
+                fsize = size_in_mb * 1024 * 1024;
+                break;
+            default:
+                fprintf(stderr,"Too many positional argumemts\n");
+                if (fp)
+                    fclose(fp);
+                usage();
+                return EXIT_FAILURE;
+        }
+     }
+
+    
+    asprintf(&current_split_name, fmask, num_split);
+    ofp = fopen(current_split_name, "wb");
+
+    if (!ofp) {
+        fprintf(stderr, "Unable to open %s for writing\n", current_split_name);
         return EXIT_FAILURE;
     }
-
-    if (size_in_mb <= 0) {
-        printf("Error: %d needs to be a positive value\n", size_in_mb);
-        usage();
-        return EXIT_FAILURE;
-    }
-
-    fsize = size_in_mb * 1024 * 1024;
-
-    sprintf(fname, "split-%d.bson", num_split);
-    ofp = fopen(fname, "wb");
 
     while (1) {
 
@@ -156,11 +210,17 @@ int main(int argc, const char * argv[]) {
             num_split++;
             fflush(ofp);
             fclose(ofp);
-            printf("[%s] bytes written: %ld docs dumped: %ld\n", fname, bytes_written, current_doc_num);
-            sprintf(fname, "split-%d.bson", num_split);
+            printf("[%s] bytes written: %ld docs dumped: %ld\n", current_split_name, bytes_written, current_doc_num);
+            free(current_split_name);
+            asprintf(&current_split_name, fmask, num_split);
             bytes_written   = 0;
             current_doc_num = 0;
-            ofp = fopen(fname, "wb");
+            ofp = fopen(current_split_name, "wb");
+
+            if (!ofp) {
+                fprintf(stderr, "Unable to open %s for writing\n", current_split_name);
+                return EXIT_FAILURE;
+            }
         }
 
         free(doc_ptr->payload);
@@ -168,10 +228,12 @@ int main(int argc, const char * argv[]) {
 
     }
 
+    free(current_split_name);
+
     if (ofp) {
         fflush(ofp);
         fclose(ofp);
-        printf("[%s] bytes written: %ld docs dumped: %ld\n", fname, bytes_written, current_doc_num);
+        printf("[%s] bytes written: %ld docs dumped: %ld\n", current_split_name, bytes_written, current_doc_num);
     }
 
     fclose(fp);
