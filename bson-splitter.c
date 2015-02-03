@@ -233,14 +233,13 @@ int main(int argc, char * argv[]) {
 
     }
 
-    free(current_split_name);
-
     if (ofp) {
         fflush(ofp);
         fclose(ofp);
         printf("[%s] bytes written: %ld docs dumped: %ld\n", current_split_name, bytes_written, current_doc_num);
     }
-
+    
+    free(current_split_name);
     fclose(fp);
 
     if (num_doc > 0) {
