@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <ctype.h>
+#include <stdbool.h>
 
 #define OFFSET 4
 #define DEFAULT_SPLIT_NAME "split-%d.bson"
@@ -93,6 +94,15 @@ size_t read_fully(unsigned char *dest, size_t start, size_t len, FILE *fp) {
     return tot;
 }
 
+FILE* mk_fileoutput(char **current_split_name, const char *fmask, const int num_split) {
+    if (asprintf(current_split_name, fmask, num_split) == -1) {
+        fprintf(stderr, "Unable allocate new file name\n");
+        return false;
+    }
+    return fopen(*current_split_name, "wb");
+}
+
+
 void usage() {
 
     fprintf(stderr, "Usage:\n");
@@ -109,6 +119,7 @@ int main(int argc, char * argv[]) {
     size_t num_doc = 0, bytes_written = 0, current_doc_num = 0;
     int num_split = 1;
     char *current_split_name = NULL;
+    char *current_xopen_cmd  = NULL;
     size_t fsize;
     int size_in_mb = 0;
     bson_doc_hnd_t *doc_ptr;
@@ -125,7 +136,8 @@ int main(int argc, char * argv[]) {
             fmask = optarg;
             break;
         case 'X':
-            printf("%s\n", optarg);
+            xpopen = optarg;
+            printf("%s\n", xpopen);
             break;
         case '?':
             if (optopt == 'f' || optopt == 'X')
@@ -190,11 +202,21 @@ int main(int argc, char * argv[]) {
     }
 
     fsize = size_in_mb * 1024 * 1024;
-    if (asprintf(&current_split_name, fmask, num_split) == -1) {
-        fprintf(stderr, "Unable allocate new file name\n");
-        return EXIT_FAILURE;
-    }
-    ofp = fopen(current_split_name, "wb");
+
+    ofp = mk_fileoutput(&current_split_name, fmask, num_split);
+
+
+
+    // if (xpopen != NULL) {
+    //     if (asprintf(&current_xopen_cmd, xpopen, current_split_name) == -1) {
+    //         fprintf(stderr, "Unable allocate new popen arg\n");
+    //         return EXIT_FAILURE;
+    //     }
+    //     ofp = popen(current_xopen_cmd, "wb");
+    // } else {
+    //     ofp = fopen(current_split_name, "wb");
+    // }
+
 
     if (!ofp) {
         fprintf(stderr, "Unable to open %s for writing\n", current_split_name);
@@ -211,6 +233,7 @@ int main(int argc, char * argv[]) {
         num_doc++;
         current_doc_num++;
         bytes_written += fwrite(doc_ptr->payload, sizeof(unsigned char), doc_ptr->payload_size, ofp);
+        fflush(ofp);
 
         if (bytes_written > fsize) {
             num_split++;
@@ -218,18 +241,13 @@ int main(int argc, char * argv[]) {
             fclose(ofp);
             printf("[%s] bytes written: %ld docs dumped: %ld\n", current_split_name, bytes_written, current_doc_num);
             free(current_split_name);
-            if (asprintf(&current_split_name, fmask, num_split) == -1) {
-                fprintf(stderr, "Unable allocate new file name\n");
-                return EXIT_FAILURE;
-            }
-            bytes_written   = 0;
-            current_doc_num = 0;
-            ofp = fopen(current_split_name, "wb");
-
+            ofp = mk_fileoutput(&current_split_name, fmask, num_split);
             if (!ofp) {
                 fprintf(stderr, "Unable to open %s for writing\n", current_split_name);
                 return EXIT_FAILURE;
             }
+            bytes_written   = 0;
+            current_doc_num = 0;
         }
 
         free(doc_ptr->payload);
