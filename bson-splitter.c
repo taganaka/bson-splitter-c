@@ -94,12 +94,31 @@ size_t read_fully(unsigned char *dest, size_t start, size_t len, FILE *fp) {
     return tot;
 }
 
-FILE* mk_fileoutput(char **current_split_name, const char *fmask, const int num_split) {
+FILE* mk_fileoutput(char **current_split_name, const char *fmask,
+                    const int num_split) {
     if (asprintf(current_split_name, fmask, num_split) == -1) {
         fprintf(stderr, "Unable allocate new file name\n");
         return false;
     }
     return fopen(*current_split_name, "wb");
+}
+
+FILE* mk_cmdoutput(char **current_split_name, char **current_xopen_cmd,
+                   const char *fmask,  const char *xpopen,
+                   const int num_split) {
+
+    if (asprintf(current_split_name, fmask, num_split) == -1) {
+        fprintf(stderr, "Unable allocate new file name\n");
+        return false;
+    }
+
+    if (asprintf(current_xopen_cmd, xpopen, *current_split_name) == -1) {
+        fprintf(stderr, "Unable allocate new popen arg\n");
+        return false;
+    }
+
+    return popen(*current_xopen_cmd, "wb");
+
 }
 
 
@@ -137,7 +156,6 @@ int main(int argc, char * argv[]) {
             break;
         case 'X':
             xpopen = optarg;
-            printf("%s\n", xpopen);
             break;
         case '?':
             if (optopt == 'f' || optopt == 'X')
@@ -203,8 +221,10 @@ int main(int argc, char * argv[]) {
 
     fsize = size_in_mb * 1024 * 1024;
 
-    ofp = mk_fileoutput(&current_split_name, fmask, num_split);
-
+    if (xpopen == NULL)
+        ofp = mk_fileoutput(&current_split_name, fmask, num_split);
+    else
+        ofp = mk_cmdoutput(&current_split_name, &current_xopen_cmd, fmask, xpopen, num_split);
 
 
     // if (xpopen != NULL) {
@@ -219,7 +239,7 @@ int main(int argc, char * argv[]) {
 
 
     if (!ofp) {
-        fprintf(stderr, "Unable to open %s for writing\n", current_split_name);
+        fprintf(stderr, "Unable to open %s for writing\n", current_xopen_cmd);
         return EXIT_FAILURE;
     }
 
@@ -241,7 +261,13 @@ int main(int argc, char * argv[]) {
             fclose(ofp);
             printf("[%s] bytes written: %ld docs dumped: %ld\n", current_split_name, bytes_written, current_doc_num);
             free(current_split_name);
-            ofp = mk_fileoutput(&current_split_name, fmask, num_split);
+            free(current_xopen_cmd);
+
+            if (xpopen == NULL)
+                ofp = mk_fileoutput(&current_split_name, fmask, num_split);
+            else
+                ofp = mk_cmdoutput(&current_split_name, &current_xopen_cmd, fmask, xpopen, num_split);
+
             if (!ofp) {
                 fprintf(stderr, "Unable to open %s for writing\n", current_split_name);
                 return EXIT_FAILURE;
@@ -262,6 +288,7 @@ int main(int argc, char * argv[]) {
     }
 
     free(current_split_name);
+    free(current_xopen_cmd);
     fclose(fp);
 
     if (num_doc > 0) {
